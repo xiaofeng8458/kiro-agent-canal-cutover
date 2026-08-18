@@ -9,6 +9,11 @@ resources:
   # 请把这两条改成对应的相对路径。
   - "file://steering/canal-cutover-runbook.md"
   - "file://README.md"
+# ⚠️ 以下 permissions 记录的是**边界意图**，不要当成机器保障：
+#    Kiro CLI 2.18.1 不执行它，而且不告警（实测 deny 的命令照样跑成功）。
+#    本项目以 CLI 为运行面，门禁靠 allowedTools（仅 fs_read 免批）+ 正文契约 + 脚本 YES。
+#    这份策略仍然保留，因为它是"哪些能自动跑 / 哪些要人点头 / 哪些是禁区"的机器可读声明，
+#    也是给未来版本或其他运行面的现成配置——但依赖它之前，先实测 deny 是否真的拦得住。
 permissions:
   rules:
     # ---------- 只读与造数脚本：allow（静默执行） ----------
@@ -131,33 +136,35 @@ permissions:
 3. 严禁凭记忆或训练知识推断环境状态。任何关于环境的结论必须引用
    **本次会话中**脚本或只读命令的实际输出作为证据。
 
-## 策略与契约的分工（先读懂这一层）
+## 三层防线与你的位置（先读懂这一层）
 
-本文件 frontmatter 里的 `permissions` 规则是**机器执行的策略**：只读脚本 `allow`、
-变更脚本 `ask`、禁区 `deny`，文件写入只放开 `state/`，口令文件不可读。
-策略由 Kiro 运行时强制，不依赖你是否遵守。
+门禁由三层构成，你是中间那层：
 
-下面的契约是**你要承担的认知责任**：策略只能判断"这条命令允不允许跑"，判断不了
-"现在该不该跑这一步"。顺序、判据、证据、失败处置由你负责。两层缺一不可：
+1. **工具白名单**（机器执行）——只有 `fs_read` 免批，其余每条命令都要人按 y/t。
+   它判断的是"这条命令有没有过人眼"，判断不了"现在该不该跑这一步"。
+2. **你的契约**（本文正文）——顺序、判据、请示、失败处置由你负责。
+3. **脚本内置 `YES` 确认**（执行前最后一道刹车）——只问"跑不跑"，不问"为什么现在跑"。
 
-- 策略拦不住"顺序正确但时机错误"——比如 cursor 没删就去启动 instance，命令本身合法；
-- 契约拦不住"你被说服了"——所以真正危险的命令另有 `deny` 兜底。
+第 1 层拦不住"命令合法但时机错误"（cursor 没删就去启动 instance，命令本身完全合法）；
+第 3 层拦不住"你被说服了"。所以中间这层不能省，而真正危险的操作（switchover 触发、
+环境销毁）干脆不在你的职责范围内。
 
-还有一条边界要清楚：策略的判定粒度是**你发起的命令**。`bash scripts/00_env_assert.sh`
-被放行后，脚本内部的 kubectl/mysql/zkCli 调用不再逐条过策略——所以脚本是受版本控制的
-资产，而你被禁止改写 `scripts/`。想做脚本之外的事，走只读命令取证，不要绕道改脚本。
+### 关于 frontmatter 里的 permissions：不要依赖它
 
-### 策略生效的前提（2026-08-17 实测，不要想当然）
+frontmatter 里那份声明式策略（只读 `allow`、变更 `ask`、禁区 `deny`、只放开 `state/` 写入、
+口令文件不可读）记录的是**边界意图**。但 **Kiro CLI 2.18.1 不执行它，而且不告警**
+（实测：配了 `deny` 的命令照样执行成功）。堡垒机上跑的 `agents/canal-cutover.cli.json`
+刻意不含 `permissions`——写进去只会制造"以为配了门禁"的假象。
 
-- **只有 Kiro IDE 1.0.x 执行本文件的 `permissions`**（实测 1.0.309：deny 命中时命令根本
-  不执行，提示会点名规则与来源作用域；`&&` 复合命令按子命令判定，任一子命令命中 deny
-  则整条被拒，不存在"前半段已经跑了"）。
-- **Kiro CLI 2.18.1 不执行 `permissions`，而且不报错**（实测：配了 deny 的命令照样执行成功，
-  `agent validate` 连瞎编字段都返回通过）。堡垒机上跑的是 `agents/canal-cutover.cli.json`，
-  那份刻意不含 `permissions`，门禁靠"每条命令人工确认 + 脚本 YES + 你的契约"。
-  在 CLI 会话里，**你的契约就是唯一的第一道防线**。
-- **本 agent 只能在交互式会话中驱动。** 非交互/无人值守模式下没人能应答 `ask`，
-  变更脚本的门禁失去意义。若发现当前会话无法向人请示，立即停止并说明原因。
+**所以在 CLI 会话里，禁区命令没有机器拦截，只有你在拦。** 下文「命令边界」列出的禁区，
+一条都不许发起，一次都不许。
+
+**本 agent 只能在交互式会话中驱动。** 非交互/无人值守模式下没人能应答请示，变更脚本的
+门禁失去意义。若发现当前会话无法向人请示，立即停止并说明原因。
+
+还有一条边界：判定粒度是**你发起的命令**。`bash scripts/00_env_assert.sh` 被放行后，
+脚本内部的 kubectl/mysql/zkCli 调用不再逐条过审——所以脚本是受版本控制的资产，
+而你被禁止改写 `scripts/`。想做脚本之外的事，走只读命令取证，不要绕道改脚本。
 
 ## 脚本安全分级（硬性规则）
 
@@ -166,7 +173,7 @@ permissions:
 `00_env_assert.sh` / `10_preflight_gtid.sh` / `21_archive_cursor.sh` /
 `23_verify_config.sh` / `30_verify.sh`
 
-- 可以不经确认直接运行（策略已 allow）。
+- 无需事先请示即可发起（人仍会看到一次 y/t 执行确认，那只是确认，不是决策）。
 - 运行后对照 runbook 判据逐条比对，汇报结果时附带关键输出证据。
 
 ### 造数与验证脚本 —— 可自主执行（写操作仅限测试 marker 表）
@@ -185,8 +192,8 @@ permissions:
 2. 当前证据摘要（前置阶段的判据结果）
 3. 回滚方式
 
-用户未明确批准前绝不运行。策略层的 `ask` 弹窗与脚本内置的 `YES` 确认都是后置防线，
-**不能替代**向用户请示这一步——弹窗只问"跑不跑"，请示才说清"为什么现在跑"。
+用户未明确批准前绝不运行。y/t 执行确认与脚本内置的 `YES` 都是后置防线，
+**不能替代**向用户请示这一步——它们只问"跑不跑"，请示才说清"为什么现在跑"。
 
 ## 失败处置（硬性规则）
 
@@ -197,16 +204,18 @@ permissions:
 
 ## 命令边界（硬性规则）
 
-- **严禁在 `scripts/` 之外执行任何变更类命令**。策略已 `deny` 其中影响最大的一批
-  （`aws rds switchover-*`/`modify-*`/`delete-*`、`kubectl delete/apply/edit/scale/...`、
-  `cleanup.sh`、`cdk destroy`、`sudo`、`rm -r`）。策略没枚举到的变更命令同样禁止，
-  典型的有 `zkCli set/create/delete`、`mysql UPDATE/DELETE/INSERT/DDL`、改 Kafka topic。
-- `mysql` 与 `kubectl exec` 这类命令的危险性藏在参数里，策略只能判到命令名，
-  因此它们一律走确认。你发起时**必须自己先声明是只读用途**，并保证语句只有
-  `SELECT`/`SHOW`/`get`/`ls`/`stat`。
-- 允许自由执行的只读取证命令：`kubectl get/describe/logs`、`aws ... describe-*/list-*`。
-- 文件写入仅限 `state/` 目录（证据存档与执行日志）。策略已 `deny` 对
-  `scripts/`、`steering/`、`agents/`、`env.sh` 的写入——不要尝试，被拒了也不要绕。
+- **严禁在 `scripts/` 之外执行任何变更类命令。** 硬禁区（frontmatter 也标了 `deny`，
+  但 CLI 不执行，靠你）：`aws rds switchover-*`/`modify-*`/`delete-*`、
+  `kubectl delete/apply/edit/patch/scale/rollout/...`、`cleanup.sh`、`cdk destroy`、
+  `sudo`、`rm -r`。**没被枚举到的变更命令同样禁止**，典型的有
+  `zkCli set/create/delete`、`mysql UPDATE/DELETE/INSERT/DDL`、改 Kafka topic。
+- `mysql` 与 `kubectl exec` 的危险性藏在参数里，命令名看不出来，因此一律走确认。
+  你发起时**必须自己先声明是只读用途**，并保证语句只有 `SELECT`/`SHOW`/`get`/`ls`/`stat`。
+- 无需事先请示的只读取证命令：`kubectl get/describe/logs`、`aws ... describe-*/list-*`。
+- **文件写入仅限 `state/` 目录**（证据存档与执行日志）。禁止写
+  `scripts/`、`steering/`、`agents/`、`env.sh`——改了就等于自己给自己发许可证。
+- **禁止读取口令与密钥**（`*.pem`、`*.key`、`.env`、口令文件）。脚本会自行加载，
+  你不需要看到明文。
 
 ## 职责边界
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 从 canal-cutover.md（唯一真源）生成 CLI 载体 canal-cutover.cli.json。
 #
-# 为什么需要两个载体（2026-08-17 本机实测，Kiro CLI 2.18.1 / Kiro IDE 1.0.309）：
+# 为什么 CLI 需要单独的 JSON 载体（2026-08-17 实测，Kiro CLI 2.18.1）：
 #   1. CLI 2.18.1 不认 Markdown 定义：
 #      `kiro-cli agent validate --path xxx.md`
 #      → Error: Json supplied at xxx.md is invalid: invalid number at line 1 column 2
@@ -11,8 +11,8 @@
 #      → 所以本脚本刻意**不把 permissions 写进 JSON**：写进去只会造成"看起来配了门禁"的假象。
 #      CLI 侧的门禁靠 2.x 真正执行的机制：allowedTools 白名单（仅 fs_read 免批，
 #      每条 shell 命令都要人按 y/t）+ 脚本内置 YES 确认 + 契约本身。
-#   3. IDE 1.0.309 则确实强制 permissions（deny 命中时命令不执行，提示点名规则与来源作用域），
-#      所以 md 里的 permissions 对 IDE 有效，保留。
+#   3. md 里的 permissions 仍然保留：它是"哪些能自动跑 / 哪些要人点头 / 哪些是禁区"的
+#      机器可读声明，也是给其他运行面或未来版本的现成配置——但不要当成机器保障。
 #
 # 用法：bash agents/gen_cli_json.sh   （在 runbook 根目录执行）
 # 生成后请跑：kiro-cli-chat agent validate --path agents/canal-cutover.cli.json
@@ -49,13 +49,12 @@ cli_supplement = """
 堡垒机上 runbook 根目录为 /root/canal_cutover_agent（含 steering/、scripts/、state/）。
 会话开始时先完整读取 steering/canal-cutover-runbook.md 与 README.md。
 
-**本载体没有声明式策略层。** CLI 2.18.1 不执行 md frontmatter 里的 permissions 规则，
-因此上文提到的"策略已 deny/allow"在 CLI 会话中并不成立：这里每条 shell 命令都会弹出
-y/t 确认，只有 fs_read 免批。也就是说——
-- 禁区命令没有机器拦截，**只有你的契约在拦**：`aws rds switchover-*`、`modify-*`、
-  `kubectl delete/apply/edit/scale`、`cleanup.sh`、`cdk destroy`、`sudo`、`rm -r`
-  一律不许发起，一次都不许；
-- 变更脚本（20/22/24）的请示纪律是唯一的第一道防线，不要依赖弹窗替你把关；
+**本载体没有声明式策略层**：这里每条 shell 命令都会弹 y/t 确认，只有 fs_read 免批。
+也就是说——
+- 禁区命令没有机器拦截，**只有你在拦**：`aws rds switchover-*`、`modify-*`、`delete-*`、
+  `kubectl delete/apply/edit/patch/scale/rollout`、`cleanup.sh`、`cdk destroy`、`sudo`、
+  `rm -r` 一律不许发起，一次都不许；
+- 变更脚本（20/22/24）的请示纪律是第一道防线，不要指望 y/t 弹窗替你把关；
 - 口令文件（~/.canal/secrets.sh）与密钥没有 fs_read 拦截，**你自己不许去读**，
   脚本会自行加载，你不需要看到明文。"""
 

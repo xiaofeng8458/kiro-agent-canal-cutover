@@ -63,7 +63,7 @@ ec2-user 另有 NOPASSWD sudo，故这不构成权限降级。
 └── canal_cutover_agent/              # runbook 资产（ec2-user 所有）
     ├── scripts/                      # 00-51 号脚本 + lib/common.sh
     ├── steering/canal-cutover-runbook.md
-    ├── agents/                       # 定义源件（md=IDE 用，cli.json=CLI 用）
+    ├── agents/                       # 定义源件（md=唯一真源，cli.json=CLI 实际加载的载体）
     ├── state/run_YYYYMMDD/           # 证据流水、cursor 存档、并集、对账产物
     ├── env.sh                        # 环境参数（600，source ~/.canal/secrets.sh，无明文）
     └── session_init.sh               # 会话初始化

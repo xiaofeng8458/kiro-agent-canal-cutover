@@ -10,7 +10,7 @@
 
 报告缺陷时请带上：
 
-- 你的 Canal 版本、MySQL 版本（含小版本号）、Kiro IDE / CLI 版本
+- 你的 Canal 版本、MySQL 版本（含小版本号）、Kiro CLI 版本
 - 复现步骤与**脚本的实际输出**（判据是哪一条不满足）
 - 你期望的行为
 
@@ -27,7 +27,7 @@ RDS/MSK endpoint、Secrets Manager 名称、口令、token、私网 IP、内部�
    `bash agents/gen_cli_json.sh` 重新生成 CLI 载体，两个文件一起提交。
    **不要手改 `agents/canal-cutover.cli.json`。**
 4. 如果你的改动依赖某个 Kiro 版本的行为，请在 PR 里写清你实测的版本号与观察到的现象。
-   README 里那张「门禁生效有版本前提」的表就是这么积累出来的。
+   本项目的验证运行面是 Kiro CLI 2.18.x；换版本时门禁语义可能变，别靠推断。
 5. 不要提交 `env.sh`、`state/` 下的运行产物、`cdk.out/`、`cdk.context.json`、任何日志文件。
    `.gitignore` 已覆盖，但请自己 `git status` 复核一遍。
 

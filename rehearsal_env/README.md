@@ -242,8 +242,10 @@ agent 会话必然以 ec2-user 运行，读不到 `/root`（600）的资产与�
 
 ## 演练蓝绿切割
 
-推荐形态是 **canal-cutover agent 驱动、人只守门禁**（分工表与三层可用性见
-`../README.md` 使用方式一节；agent 的职责边界见 `../steering/canal-cutover-runbook.md` 3.5 节）。
+推荐形态是 **canal-cutover agent（Kiro CLI 会话）驱动、人只守门禁**。人与 agent 的分工表见
+[`../README.md` 第 2 节](../README.md#2-kiro-custom-agent-是什么)，权限与 SOP 的定义方式见
+[第 3 节](../README.md#3-权限与-sop-怎么控制)，agent 的职责边界见
+`../steering/canal-cutover-runbook.md` 3.5 节。agent 不可用时可退回纯人工跑同一套脚本。
 
 1. 准备：把 canal_cutover_agent 传到跳板机；复制 env.sh.sample 为 env.sh 按本环境填写
    （ZK_NS=common-service、ZK_POD=zookeeper-0、DESTINATION=server-0、
