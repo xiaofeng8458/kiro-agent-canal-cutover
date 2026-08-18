@@ -1,0 +1,5 @@
+# 与生产一致的 namespace，便于 cutover_agent 脚本原样使用
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: common-service

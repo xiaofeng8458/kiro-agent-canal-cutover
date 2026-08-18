@@ -1,0 +1,68 @@
+# canal-server x1 StatefulSet（与生产一致：admin 托管模式 restart.sh local，
+# 官方镜像内置 app.sh，pod 名 canal-server-0，headless service）
+apiVersion: v1
+kind: Service
+metadata:
+  name: canal-server-headless
+  namespace: common-service
+spec:
+  clusterIP: None
+  ports:
+    - port: 11110
+      name: admin
+    - port: 11111
+      name: tcp
+    - port: 11112
+      name: metric
+  selector:
+    app: canal-server
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: canal-server
+  namespace: common-service
+spec:
+  serviceName: canal-server-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canal-server
+  template:
+    metadata:
+      labels:
+        app: canal-server
+    spec:
+      containers:
+        - name: canal-server
+          image: canal/canal-server:v1.1.8
+          ports:
+            - containerPort: 11110
+            - containerPort: 11111
+            - containerPort: 11112
+          env:
+            # canal.admin.manager 非空 => app.sh 走 restart.sh local 分支（admin 托管），与生产一致
+            - name: canal.admin.manager
+              value: "canal-admin.common-service:8089"
+            # 用 StatefulSet 稳定 DNS 注册（缺省注册 pod IP，pod 重建后 Admin 的探活/启停全部失效，
+            # UI 表现为 server 断开、instance 停止，而数据面照常运行——状态与真相脱节）
+            - name: canal.register.ip
+              value: "canal-server-0.canal-server-headless.common-service"
+            - name: canal.admin.port
+              value: "11110"
+            - name: canal.admin.user
+              value: "admin"
+            # 默认值对应密码 admin（server<->admin 通信认证）。演练环境可用；生产必须改
+            - name: canal.admin.passwd
+              value: "4ACFE3202A5FF5CF467898FC58AAB1D615029441"
+            - name: canal.admin.register.auto
+              value: "true"
+            # 自动注册进 Admin 的 rehearsal 集群（需先在 Admin UI 创建同名集群，见 README 第 6 步）
+            - name: canal.admin.register.cluster
+              value: "rehearsal"
+          resources:
+            requests:
+              memory: 1536Mi
+              cpu: 500m
+            limits:
+              memory: 2560Mi

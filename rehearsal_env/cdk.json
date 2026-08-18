@@ -1,0 +1,8 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/rehearsal.ts",
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/aws-ec2:restrictDefaultSecurityGroup": true,
+    "@aws-cdk/core:checkSecretUsage": true
+  }
+}

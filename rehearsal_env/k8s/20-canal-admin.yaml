@@ -1,0 +1,70 @@
+# canal-admin x2（与生产一致：控制台双副本，无状态，共享 canal_manager 库）
+# 依赖 k8s secret canal-admin-db（address/username/password），创建方式见 README 第 4 步
+apiVersion: v1
+kind: Service
+metadata:
+  name: canal-admin
+  namespace: common-service
+spec:
+  ports:
+    - port: 8089
+      name: http
+  selector:
+    app: canal-admin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canal-admin
+  namespace: common-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: canal-admin
+  template:
+    metadata:
+      labels:
+        app: canal-admin
+    spec:
+      containers:
+        - name: canal-admin
+          image: canal/canal-admin:v1.1.8
+          ports:
+            - containerPort: 8089
+          env:
+            - name: server.port
+              value: "8089"
+            - name: spring.datasource.address
+              valueFrom:
+                secretKeyRef:
+                  name: canal-admin-db
+                  key: address
+            - name: spring.datasource.database
+              value: canal_manager
+            # 覆盖内置连接串：caching_sha2_password 账号在非 SSL 下需要 allowPublicKeyRetrieval
+            # （镜像自带的 url 只有 useSSL=false，会报 Public Key Retrieval is not allowed）
+            - name: spring.datasource.url
+              value: "jdbc:mysql://${spring.datasource.address}/${spring.datasource.database}?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: spring.datasource.username
+              valueFrom:
+                secretKeyRef:
+                  name: canal-admin-db
+                  key: username
+            - name: spring.datasource.password
+              valueFrom:
+                secretKeyRef:
+                  name: canal-admin-db
+                  key: password
+            # server<->admin 通信凭证：1.1.8 起 adminPasswd 不允许为空（issue #4941）。
+            # 值 admin 与 30-canal-server.yaml 的 canal.admin.passwd 哈希（4ACFE...441）配对；生产必须改
+            - name: canal.adminUser
+              value: admin
+            - name: canal.adminPasswd
+              value: admin
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 1Gi

@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+**/._*
+
+# 环境参数与口令：绝不入库
+env.sh
+!env.sh.sample
+.env
+.env.*
+*.env
+secrets.sh
+canal_env.sh
+msk_env.sh
+session_init.sh
+*.pem
+*.key
+*.p12
+*.keystore
+credentials
+.admin_token
+
+# 运行产物 / 日志
+*.log
+*.out
+state/*
+!state/.gitkeep
+reports/rehearsal_*/
+
+# CDK / Node
+node_modules/
+cdk.out/
+cdk.context.json
+*.tsbuildinfo
+
+# 编辑器
+.idea/
+.vscode/

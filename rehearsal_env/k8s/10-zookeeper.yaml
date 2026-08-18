@@ -1,0 +1,72 @@
+# 单节点 ZooKeeper：canal 位点存储（default-instance.xml 模式）
+# 注意：EKS 1.30+ 不再有默认 StorageClass，必须显式创建并引用（否则 PVC 永远 Pending）
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  encrypted: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: common-service
+spec:
+  ports:
+    - port: 2181
+      name: client
+  selector:
+    app: zookeeper
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: common-service
+spec:
+  serviceName: zookeeper
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: zookeeper:3.8
+          ports:
+            - containerPort: 2181
+          env:
+            - name: ZOO_STANDALONE_ENABLED
+              value: "true"
+            # 放开排障用四字命令（srvr/cons 是 runbook 对账三件套）
+            - name: ZOO_4LW_COMMANDS_WHITELIST
+              value: "srvr,cons,stat,ruok"
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 2Gi
