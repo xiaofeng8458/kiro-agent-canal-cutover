@@ -161,26 +161,33 @@ Kiro custom agent。人只在门禁点按批准。
 
 | 层 | 是什么 | 拦什么 | 在哪定义 |
 |---|---|---|---|
-| **工具白名单** | Kiro CLI 只让 `fs_read` 免批，其余每条命令弹 y/t | 未经人眼的命令执行 | `agents/canal-cutover.cli.json` 的 `allowedTools` |
+| **声明式策略** | `permissions` 规则：只读脚本 `allow`、变更脚本 `ask`、禁区 `deny`，由 Kiro 运行时强制 | 禁区命令、未经人眼的变更 | `agents/canal-cutover.md` frontmatter（CLI 载体同源携带） |
 | **行为契约** | agent 的系统提示词：顺序、判据、请示、失败即停 | "命令合法但时机错误" | `agents/canal-cutover.md` 正文 |
 | **脚本内置门禁** | 变更脚本打印计划与回滚，要求逐字输入 `YES` | agent 或人的手滑 | `scripts/lib/common.sh` 的 `confirm()` |
 
-三层的分工可以这样理解：白名单判断"这条命令允不允许跑"，契约判断"现在该不该跑这一步"，
-`YES` 确认是最后一道执行前的刹车。**白名单拦不住顺序错误，契约拦不住被说服**，
+三层的分工可以这样理解：策略判断"这条命令允不允许跑"，契约判断"现在该不该跑这一步"，
+`YES` 确认是最后一道执行前的刹车。**策略拦不住顺序错误，契约拦不住被说服**，
 所以真正危险的操作（switchover 触发、环境销毁）干脆不在脚本范围内，由人执行。
 
-### 关于声明式 permissions（重要）
+### 关于声明式 permissions：版本前提（重要）
 
 `agents/canal-cutover.md` 的 frontmatter 里有一份 `permissions` 策略
 （只读脚本 `allow`、变更脚本 `ask`、禁区 `deny`、只放开 `state/` 的写入、口令文件不可读）。
+**这份策略是否被执行，取决于你跑在哪个版本上——这是本项目栽过跟头的地方：**
 
-**Kiro CLI 2.18.1 不执行这份策略，而且不告警。** 实测：配了 `deny` 的命令照样执行成功；
-`agent validate` 连瞎编的字段都返回退出码 0——"校验通过"不等于"规则生效"。因此
-`canal-cutover.cli.json` **刻意不含** `permissions` 字段：写进去只会制造"以为配了门禁"的
-假象，那与本项目复盘里"配置被静默忽略"的事故属于同一失败类别。
-
-**在 CLI 会话里，上表那三层就是全部的防线，禁区命令没有机器拦截。** 换 Kiro 版本前先实测
-`deny` 是否真的拦得住，再决定要不要依赖它——不要假设新版本更严格。
+- **Kiro CLI 3.0（`kiro-cli --v3`）执行它。** CLI 3.0 与 IDE 共用同一 unified harness，
+  官方文档明确 agent 内嵌 `permissions` 是被评估的作用域（`deny` > `ask` > `allow`，
+  见 [kiro.dev/docs/cli/v3](https://kiro.dev/docs/cli/v3/)）。因此本仓库的
+  `canal-cutover.cli.json` **携带与 md 完全相同的 permissions**（由 `gen_cli_json.sh` 生成），
+  并以 **v3 启动为硬性前提**。
+- **Kiro CLI 2.x 不执行它，而且不告警。** 实测（2.18.1）：配了 `deny` 的命令照样执行成功；
+  `agent validate` 连瞎编的字段都返回退出码 0——"校验通过"不等于"规则生效"。
+  在 2.x 会话里禁区命令没有任何机器拦截，那与本项目复盘里"配置被静默忽略"的事故
+  属于同一失败类别。
+- **文档结论要落地成实测结论。** `setup_cli_agent.sh` 部署时先做版本闸门（2.x 且无
+  `--v3` 开关直接终止），再跑 **deny 冒烟探针**：探针 agent 配一条 allow、一条 deny，
+  非交互跑一次，只看文件系统证据——allow 命令必须落盘、deny 命令必须被拦，
+  探针不过不许开工。换任何 Kiro 版本，先重跑探针再决定依赖——不要假设新版本更严格。
 
 ### SOP 定义在哪
 
@@ -236,7 +243,7 @@ agent 自己读不到明文。
 | Canal | 1.1.8，Admin 托管模式，位点存 ZooKeeper（`default-instance.xml`） |
 | 数据库 | RDS for MySQL，`gtid-mode=ON` / `enforce_gtid_consistency=ON` / `binlog_format=ROW` |
 | 运行环境 | bash 4+、`mysql` 客户端、`kubectl`、`jq`、`curl`、AWS CLI v2 |
-| Agent | Kiro CLI 2.18.x（本项目的验证版本） |
+| Agent | Kiro CLI **3.0 / `--v3`**（硬性前提：`permissions` 门禁只在 v3 上执行；2.x 会静默忽略） |
 | 演练环境 | Node.js 20+、AWS CDK v2、**一个已有 VPC**（本栈不创建 VPC）、AWS 凭证 |
 
 ### 4.2 起演练环境
@@ -288,13 +295,14 @@ TIMEOUT=900 ./ssm_run.sh -f verify_e2e.sh # 端到端：建 topic → 写 marker
 
 ```bash
 # 本地执行，装 agent 到跳板机
-./ssm_run.sh -f setup_cli_agent.sh        # 口令收敛 + 资产归位 + 装到 ~/.kiro/agents/ + validate
+./ssm_run.sh -f setup_cli_agent.sh        # 版本闸门(v3) + 口令收敛 + 装到 ~/.kiro/agents/ + validate + deny 冒烟探针
 ./ssm_run.sh -f smoke_cli_agent.sh        # 只读冒烟（--trust-tools=fs_read，拿不到 shell）
 ```
 
-`setup_cli_agent.sh` 做四件事：把口令收敛到单一权威位置、把 runbook 资产的属主统一到运行
-身份、按目标机实际路径重写定义里的 `resources` 与 runbook 根路径、装到全局并 validate。
-它还会**检查 CLI 版本**：非 2.18.x 会明确提示"门禁语义可能已变，部署前必须重测"。
+`setup_cli_agent.sh` 做五件事：**CLI 版本闸门**（v3 是硬性前提，2.x 且无 `--v3` 开关直接
+终止）、把口令收敛到单一权威位置、把 runbook 资产的属主统一到运行身份、按目标机实际路径
+重写定义里的 `resources` 与 runbook 根路径并装到全局做 validate、最后跑 **deny 冒烟探针**
+把"文档说 v3 执行 permissions"变成本机实测结论——探针不过不许开工。
 
 `smoke_cli_agent.sh` 是零风险验收：只信任 `fs_read`，agent 拿不到 shell，用三个问题验证
 "定义能加载 / 提示词生效 / 门禁规则已内化"。**绝不要用 `--trust-all-tools`**——那等于把
@@ -305,7 +313,7 @@ agent 的门禁整层拆掉。
 ```bash
 cd ~/canal_cutover_agent
 source session_init.sh                    # 加载 env.sh + PATH，打印 pf 服务状态
-kiro-cli-chat chat --agent canal-cutover  # 注意 --agent 是 chat 子命令的参数
+kiro-cli --v3 chat --agent canal-cutover  # 必须带 v3（原生 3.x 可省 --v3）；--agent 是 chat 子命令的参数
 ```
 
 ### 4.4 跑一次演练

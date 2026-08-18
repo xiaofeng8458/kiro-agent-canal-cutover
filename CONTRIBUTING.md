@@ -27,7 +27,9 @@ RDS/MSK endpoint、Secrets Manager 名称、口令、token、私网 IP、内部�
    `bash agents/gen_cli_json.sh` 重新生成 CLI 载体，两个文件一起提交。
    **不要手改 `agents/canal-cutover.cli.json`。**
 4. 如果你的改动依赖某个 Kiro 版本的行为，请在 PR 里写清你实测的版本号与观察到的现象。
-   本项目的验证运行面是 Kiro CLI 2.18.x；换版本时门禁语义可能变，别靠推断。
+   本项目的 CLI 运行面以 **v3（`kiro-cli --v3` 或原生 3.x）为硬性前提**——agent 的
+   permissions 门禁只在 v3 上执行，2.x 会静默忽略（详见 README 的版本前提表）。
+   换版本时门禁语义可能变，别靠推断：跑一遍 `setup_cli_agent.sh` 的 deny 冒烟探针再下结论。
 5. 不要提交 `env.sh`、`state/` 下的运行产物、`cdk.out/`、`cdk.context.json`、任何日志文件。
    `.gitignore` 已覆盖，但请自己 `git status` 复核一遍。
 

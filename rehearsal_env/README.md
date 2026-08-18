@@ -101,10 +101,11 @@ TIMEOUT=900 ./ssm_run.sh -f verify_e2e.sh # 端到端：建 topic → 写 marker
 ./ssm_run.sh 'cd /root/canal_cutover_agent && bash scripts/00_env_assert.sh'   # P0 验收
 ```
 
-装完 Kiro CLI（需人工登录认证）后，再配 CLI agent：
+装完 Kiro CLI（需人工登录认证；**须为 3.0 或带 `--v3` 开关的版本**——agent 的
+permissions 门禁只在 v3 上执行）后，再配 CLI agent：
 
 ```bash
-./ssm_run.sh -f setup_cli_agent.sh        # 口令收敛 + ec2-user 侧资产 + agent 装到 ~/.kiro/agents + validate
+./ssm_run.sh -f setup_cli_agent.sh        # 版本闸门(v3) + 口令收敛 + agent 装到 ~/.kiro/agents + validate + deny 冒烟探针
 ./ssm_run.sh -f smoke_cli_agent.sh        # 只读冒烟（--trust-tools=fs_read，拿不到 shell）
 ```
 

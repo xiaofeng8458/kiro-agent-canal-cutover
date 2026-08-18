@@ -33,7 +33,7 @@
 |---|---|---|
 | mysql 客户端（mariadb105）、jq、git | userData 自动安装 | 系统路径 |
 | kubectl v1.35.0 | userData 下载 | /usr/local/bin/kubectl |
-| **Kiro CLI 2.18.1** | 手工安装（2026-08-15） | **/home/ec2-user/.local/bin/**（kiro-cli / kiro-cli-chat / kiro-cli-term） |
+| **Kiro CLI**（基线 2.18.1；**现要求 3.0 / `--v3`**） | 手工安装 | **/home/ec2-user/.local/bin/**（kiro-cli / kiro-cli-chat / kiro-cli-term）。agent 的 permissions 门禁只在 v3 上执行，`setup_cli_agent.sh` 会做版本闸门：2.x 且无 `--v3` 开关直接终止 |
 | kubeconfig | `aws eks update-kubeconfig --name canal-rehearsal` | /root/.kube/config **与** /home/ec2-user/.kube/config |
 
 Kiro CLI 登录态：`/home/ec2-user/.kiro/`（IAM Identity Center，`kiro-cli whoami` 可验）。
@@ -126,7 +126,7 @@ aws ssm start-session --target <BastionId> --region us-east-1
 # ★ Agent 会话：停在 ec2-user，不要 sudo su -（Kiro CLI 与登录态都在 ec2-user 下）
 cd ~/canal_cutover_agent
 source session_init.sh                       # 加载 env.sh + PATH，打印 pf 服务状态
-kiro-cli-chat chat --agent canal-cutover
+kiro-cli --v3 chat --agent canal-cutover     # 必须 v3：permissions 门禁只在 v3 上执行（原生 3.x 可省 --v3）
 
 # Admin UI（两级隧道：本地 SSM 端口转发 → 跳板机 port-forward → pod）
 aws ssm start-session --target <BastionId> --region us-east-1 \
@@ -180,6 +180,7 @@ kiro-cli whoami                                           # 确认 CLI 登录态
    `WARNING: Agent conflict for canal-cutover. Using workspace version.`——
    切割现场不该有这种噪音。因 agent 定义内的 `resources` 与 runbook 根路径都是**绝对路径**，
    只留全局一份即可从任意目录启动，行为一致且无警告
-9. `kiro-cli-chat chat` 的非交互冒烟用 `--no-interactive --trust-tools=fs_read`：
+9. 非交互冒烟（`smoke_cli_agent.sh`）用 `--no-interactive --trust-tools=fs_read`：
    只给读权限、拿不到 shell，可零风险验证「定义加载 / 提示词生效 / 门禁规则已内化」。
-   **绝不要用 `--trust-all-tools`**——那等于拆掉 agent 的门禁
+   **绝不要用 `--trust-all-tools`**——那等于拆掉 agent 的门禁。
+   permissions 的生效性另有 `setup_cli_agent.sh` §8 的 deny 冒烟探针把关（v3 前提）

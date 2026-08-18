@@ -31,10 +31,14 @@
 ```bash
 aws ssm start-session --target "$BASTION_ID" --region us-east-1
 cd ~/canal_cutover_agent && source session_init.sh
-kiro-cli-chat chat --agent canal-cutover
+kiro-cli --v3 chat --agent canal-cutover     # 原生 3.x 可省 --v3
 ```
 
 `session_init.sh` 会打印 `DESTINATION=server-0`、`ADMIN_API=...`、pf 服务状态。三项都对再往下。
+
+⚠️ **必须以 CLI v3 启动**：agent 的 permissions 门禁（禁区 deny、变更脚本 ask）只在
+v3 上被执行，2.x 会静默忽略。`setup_cli_agent.sh` 部署时已做版本闸门与 deny 冒烟探针；
+若你换了机器或重装了 CLI，先重跑它，探针不过不开工。
 
 第一句给 agent：
 
